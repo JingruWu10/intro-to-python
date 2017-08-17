@@ -1,0 +1,45 @@
+from urllib.request import urlopen
+import re
+from bs4 import BeautifulSoup
+import csv
+
+herbs_page = urlopen("http://www.herbaltransitions.com/BotanCom.html")
+soup = BeautifulSoup(herbs_page, 'html.parser')
+herb_links = soup.body.p.find_all('a')[2:]
+
+cout = 1
+result = []
+for herb_link in herb_links:
+    try:
+        href = herb_link.get('href')
+        if not href:
+            continue
+        ref = "http://www.herbaltransitions.com/" + href
+        herb_page = urlopen(ref)
+        link_soup = BeautifulSoup(herb_page, 'html.parser')
+        names = link_soup.head.title.string.split('-')
+
+        m = re.search('(.+?) \((.+?)\)', str(names[-1]))
+        if not m:
+            continue
+        # print(m.group(4))
+        name = m.group(1)
+        common_name = m.group(2)
+        use= link_soup.body.p
+        m = re.search('<b>Use:</b>(.+?)<br/>', str(use))
+        if not m:
+            m = re.search('<b>Use: </b>(.+?)<br/>', str(use))
+        if m:
+            use = m.group(1).split(',')
+            use = ' '.join(list(map(lambda x: x[5:], use)))
+        else:
+            use = ''
+        result.append([name.strip(' '), common_name.strip(' '), use.strip(' ').rstrip('.')])
+    except Exception as err:
+        print(herb_link)
+        print(err)
+
+with open('herbs.csv', 'w') as outcsv:
+    writer = csv.DictWriter(outcsv, fieldnames = ["Name", "Common Name", "Use"])
+    writer.writeheader()
+    writer.writerows({'Name': row[0], 'Common Name': row[1], 'Use': row[2]} for row in result)
